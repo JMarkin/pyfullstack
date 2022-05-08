@@ -1,0 +1,65 @@
+
+version: "3.7"
+
+networks:
+  default:
+    name: pyfullstack
+
+x-common: &common
+  env_file: ../../.env
+  tmpfs:
+    - /run
+    - /var/cache
+    - /tmp
+
+volumes:
+  db:
+
+
+services:
+  postgres:
+    image: postgres:alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+    volumes:
+      - db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  back:
+    image: back:prod
+    build:
+      context: ../..
+      dockerfile: ./docker/prod/back.dockerfile
+    command: uvicorn --host 0.0.0.0 --reload back.app:app
+    <<: *common
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    image: back:prod
+    build:
+      context: ../..
+      dockerfile: ./docker/prod/back.dockerfile
+    command: bash -c "dbmate up && \
+            python -m back init-ticker || \
+            python -m back collect-worker"
+    <<: *common
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nginx:
+    build:
+      context: ../..
+      dockerfile: ./docker/prod/front.dockerfile
+    <<: *common
+    ports:
+      - 8000:80
+    depends_on:
+      - back
+      - worker

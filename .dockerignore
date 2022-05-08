@@ -1,0 +1,13 @@
+*
+*.pyc
+front/node_modules
+front/dist
+!back
+!front
+!nginx
+!poetry.lock
+!pyproject.toml
+!.pylintrc
+!package.json
+!pnpm-lock.yaml
+!db
