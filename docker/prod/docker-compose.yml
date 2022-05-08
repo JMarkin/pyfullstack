@@ -29,6 +29,18 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  init_db:
+    image: back:prod
+    build:
+      context: ../..
+      dockerfile: ./docker/prod/back.dockerfile
+    command: bash -c "dbmate up && python -m back init-ticker"
+    <<: *common
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   back:
     image: back:prod
     build:
@@ -37,21 +49,17 @@ services:
     command: uvicorn --host 0.0.0.0 --reload back.app:app
     <<: *common
     depends_on:
-      postgres:
-        condition: service_healthy
+      - init_db
 
   worker:
     image: back:prod
     build:
       context: ../..
       dockerfile: ./docker/prod/back.dockerfile
-    command: bash -c "dbmate up && \
-            python -m back init-ticker || \
-            python -m back collect-worker"
+    command: python -m back collect-worker
     <<: *common
     depends_on:
-      postgres:
-        condition: service_healthy
+      - init_db
 
   nginx:
     build:
@@ -62,4 +70,3 @@ services:
       - 8000:80
     depends_on:
       - back
-      - worker
